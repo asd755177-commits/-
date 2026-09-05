@@ -18,10 +18,9 @@ export default function Home() {
   const [selected, setSelected] = useState<number | 'custom'>(0);
   const [customAmount, setCustomAmount] = useState('');
   const isCustom = selected === 'custom';
-  const fixedPlan = isCustom ? null : plans[selected];
-  const amount = isCustom ? Number(customAmount) : fixedPlan.amount;
+  const amount = isCustom ? Number(customAmount) : plans[selected].amount;
   const hasAmount = Number.isInteger(amount) && amount >= 1000 && amount <= 19999;
-  const paymentUrl = isCustom ? customPaymentUrl : fixedPlan.url;
+  const paymentUrl = isCustom ? customPaymentUrl : plans[selected].url;
 
   return <main>
     <section className="page shell">
