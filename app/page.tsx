@@ -27,7 +27,7 @@ export default function Home() {
 
   return <main>
     <section className="page shell">
-      <div className="brandHero"><img src="/sugo-banner.png" alt="SUGO" /><div><p className="step">SUGO 儲值中心</p><h1>快速儲值</h1><p>輸入帳號 UID、選擇金額，即可前往信用卡或超商付款。</p></div></div>
+      <div className="brandHero"><img className="heroPromo" src="/sugo-promo.png" alt="為心動加值，與有趣的人連線" /><div className="heroCopy"><p className="step">SUGO 儲值中心</p><h1>快速儲值</h1><p>輸入帳號 UID、選擇金額，即可前往信用卡或超商付款。</p></div></div>
       <section className="uidPanel" aria-labelledby="uid-title">
         <div className="panelHead"><div><span className="number">1</span><div><h2 id="uid-title">儲值帳號</h2><p>請填寫 SUGO UID，確保點數入到正確帳號。</p></div></div><img className="uidLogo" src="/sugo-lite.png" alt="SUGO Lite" /></div>
         <div className="uidForm"><label htmlFor="sugo-uid">SUGO UID</label><div className="uidRow"><input id="sugo-uid" value={uid} onChange={event => { setUid(event.target.value); setUidConfirmed(false); }} placeholder="請輸入 SUGO UID" autoComplete="off" /><button type="button" onClick={() => setUidConfirmed(uid.trim().length > 0)} disabled={!uid.trim()}>確認 UID</button></div><p className="fieldNote">UID 僅用於本次儲值流程，請再次確認英數字是否正確。</p>{uidConfirmed && <p className="successNote" role="status">UID 已確認：{uid.trim()}</p>}</div>
@@ -46,8 +46,9 @@ export default function Home() {
         <div className="summary" aria-live="polite"><span>{!uidConfirmed ? '請先確認 UID' : hasAmount ? '已選擇 ' + number(amount * 48) + ' 點' : '請先輸入自訂金額'}</span><strong>{hasAmount ? 'TWD ' + number(amount) : '—'}</strong></div>
         {canPay ? <a className="checkoutButton" href={paymentUrl} target="_blank" rel="noopener noreferrer">前往付款 <span aria-hidden="true">→</span></a> : <button className="checkoutButton unavailable" type="button" disabled>{!uidConfirmed ? '確認 UID 後付款' : '輸入金額後付款'}</button>}
       </section>
-      <section className="help"><img className="promoImage" src="/sugo-promo.png" alt="SUGO 品牌宣傳" /><h2>付款與儲值說明</h2><p>每個方案使用同一付款入口，可在付款頁選擇信用卡或超商。付款完成後請保留交易憑證；自訂金額請依付款頁顯示為準。目前尚未提供付款後自動入點，僅限 TW 幣商替 TW 區域帳號儲值。</p></section>
+      <section className="help"><h2>付款與儲值說明</h2><p>每個方案使用同一付款入口，可在付款頁選擇信用卡或超商。付款完成後請保留交易憑證；自訂金額請依付款頁顯示為準。目前尚未提供付款後自動入點，僅限 TW 幣商替 TW 區域帳號儲值。</p></section>
     </section>
     <footer><div className="shell"><span>SUGO 儲值中心</span><span><a href="https://voicemaker.media/terms_zh-TW.html" target="_blank" rel="noopener noreferrer">服務條款</a>　<a href="https://voicemaker.media/privacy_zh-TW.html" target="_blank" rel="noopener noreferrer">隱私政策</a>　<span>聯絡客服</span></span></div></footer>
   </main>;
 }
+
