@@ -22,10 +22,11 @@ export async function GET(request: Request) {
       if (controller.signal.aborted) throw error;
       return reply({ message: '查詢服務回傳格式錯誤，請稍後再試' }, 502);
     }
-    if (data?.code === 20308) return reply({ code: 20308, message: '查無此 UID，請重新確認' }, 404);
-    if (data?.code === 45) return reply({ code: 45, message: '查詢服務尚未完成 IP 授權，請聯絡客服' }, 503);
+    const code = data?.rspHead?.code ?? data?.code;
+    if (code === 20308) return reply({ code: 20308, message: '查無此 UID，請重新確認' }, 404);
+    if (code === 45) return reply({ code: 45, message: '查詢服務尚未完成 IP 授權，請聯絡客服' }, 503);
     if (!response.ok) return reply({ message: '查詢服務暫時無法使用，請稍後再試' }, 502);
-    if (data?.code === 0 && typeof data?.userInfo?.nickname === 'string') {
+    if (code === 0 && typeof data?.userInfo?.nickname === 'string') {
       return reply({ code: 0, uid, nickname: data.userInfo.nickname });
     }
     return reply({ message: '查詢服務回傳格式或狀態異常，請稍後再試' }, 502);
@@ -33,3 +34,4 @@ export async function GET(request: Request) {
     return reply({ message: controller.signal.aborted ? '查詢逾時，請稍後再試' : '查詢網路連線失敗，請稍後再試' }, controller.signal.aborted ? 504 : 502);
   } finally { clearTimeout(timer); }
 }
+
