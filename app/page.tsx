@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const plans = [
   { amount: 1000, url: 'https://tinyurl.funpoint.com.tw/E5078C' },
@@ -17,6 +17,50 @@ const number = (value: number) => value.toLocaleString('zh-TW');
 export default function Home() {
   const [uid, setUid] = useState('');
   const [uidConfirmed, setUidConfirmed] = useState(false);
+  const [lookup, setLookup] = useState<{ uid: string; nickname: string } | null>(null);
+  const [lookupError, setLookupError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => activeRequest.current?.abort(), []);
+
+  function changeUid(value: string) {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setUid(value); setUidConfirmed(false); setLookup(null); setLookupError(''); setLoading(false);
+  }
+
+  async function confirmUid() {
+    activeRequest.current?.abort();
+    setUidConfirmed(false); setLookup(null); setLookupError('');
+    if (!/^[0-9]+$/.test(uid) || uid.length > 64) {
+      setLoading(false);
+      setLookupError('UID 格式錯誤，請輸入純數字 UID（不支援 Show ID／Gold ID）');
+      return;
+    }
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setLoading(true);
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch('/api/uid?uid=' + encodeURIComponent(uid), { signal: controller.signal, cache: 'no-store' });
+      let data;
+      try { data = await response.json(); }
+      catch (error) {
+        if (controller.signal.aborted) throw error;
+        throw new Error('查詢服務回傳格式錯誤，請稍後再試');
+      }
+      if (activeRequest.current !== controller) return;
+      if (!response.ok) throw new Error(typeof data?.message === 'string' ? data.message : '查詢服務暫時無法使用，請稍後再試');
+      if (data?.code !== 0 || data.uid !== uid || typeof data.nickname !== 'string') throw new Error('查詢服務回傳格式錯誤，請稍後再試');
+      setLookup({ uid: data.uid, nickname: data.nickname });
+      setUidConfirmed(true);
+    } catch (error) {
+      if (activeRequest.current === controller) setLookupError(controller.signal.aborted ? '查詢逾時，請稍後再試' : error instanceof TypeError ? '查詢網路連線失敗，請稍後再試' : error instanceof Error ? error.message : '查詢失敗，請稍後再試');
+    } finally {
+      clearTimeout(timer);
+      if (activeRequest.current === controller) { setLoading(false); activeRequest.current = null; }
+    }
+  }
   const [selected, setSelected] = useState<number | 'custom'>(0);
   const [customAmount, setCustomAmount] = useState('');
   const isCustom = selected === 'custom';
@@ -32,7 +76,7 @@ export default function Home() {
       <div className="journey" aria-label="儲值步驟"><span><b>01</b> 填寫 UID</span><i aria-hidden="true">→</i><span><b>02</b> 選擇金額</span><i aria-hidden="true">→</i><span><b>03</b> 前往付款</span></div>
       <section className="uidPanel" aria-labelledby="uid-title">
         <div className="panelHead"><div><span className="number">1</span><div><h2 id="uid-title">儲值帳號</h2><p>請填寫要儲值的 SUGO 帳號 UID。</p></div></div><img className="uidLogo" src="/sugo-lite.png" alt="SUGO Lite" /></div>
-        <div className="uidForm"><label htmlFor="sugo-uid">SUGO UID</label><div className="uidRow"><input id="sugo-uid" value={uid} onChange={event => { setUid(event.target.value); setUidConfirmed(false); }} placeholder="請輸入 SUGO UID" autoComplete="off" /><button type="button" onClick={() => setUidConfirmed(uid.trim().length > 0)} disabled={!uid.trim()}>確認 UID</button></div><p className="fieldNote">UID 僅暫存於此頁，尚未驗證帳號或傳送至付款頁。請向幣商確認入點方式。</p>{uidConfirmed && <p className="successNote" role="status">已確認填寫（尚未驗證帳號）：{uid.trim()}</p>}</div>
+        <form className="uidForm" onSubmit={event => { event.preventDefault(); void confirmUid(); }}><label htmlFor="sugo-uid">SUGO UID</label><div className="uidRow"><input id="sugo-uid" value={uid} onChange={event => changeUid(event.target.value)} inputMode="numeric" maxLength={64} aria-describedby="uid-note uid-result" aria-invalid={!!lookupError} placeholder="請輸入純數字 SUGO UID" autoComplete="off" /><button type="submit" disabled={loading || !uid}>{loading ? '查詢中…' : '確認 UID'}</button></div><p id="uid-note" className="fieldNote">僅支援純數字 UID，不支援 Show ID／Gold ID。此功能只查詢帳號，不會自動入點。</p><div id="uid-result" aria-live="polite" aria-busy={loading}>{loading && <p className="fieldNote">正在查詢帳號，請稍候…</p>}{lookupError && <p role="alert" style={{ color: '#a52f50', marginTop: 12 }}>{lookupError}</p>}{uidConfirmed && lookup && <p className="successNote" role="status">帳號暱稱：{lookup.nickname}<br />UID：{lookup.uid}</p>}</div></form>
       </section>
       <section className="panel" id="packages" aria-labelledby="package-title" style={{ scrollMarginTop: 90 }}>
         <div className="panelHead"><div><span className="number">2</span><div><h2 id="package-title">為下一次心動加值</h2><p>兌換比例：TWD 1＝48 點</p></div></div><span style={{ fontSize: 14, color: '#697386' }}>信用卡／超商</span></div>
