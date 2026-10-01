@@ -1,0 +1,1 @@
+{"name":"accounting-quest-tw","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","check":"node --check worker/app.js && node --check worker/runtime.js && node scripts/verify.mjs"}}
