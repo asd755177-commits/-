@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import worker,{validateContent,parseLaw,reconcile} from '../dist/server/index.js';
+const seed=JSON.parse(fs.readFileSync('content/seed.json','utf8'));
+validateContent(seed);
+const mem=new Map();const env={CONTENT:{get:async key=>mem.has(key)?{json:async()=>JSON.parse(mem.get(key))}:null,put:async(k,v)=>mem.set(k,v)}};
+let r=await worker.fetch(new Request('https://local.test/api/content'),env);assert.equal(r.status,200);assert.equal((await r.json()).questions.length,63);
+r=await worker.fetch(new Request('https://local.test/api/content',{method:'PUT',body:JSON.stringify(seed),headers:{'X-Requested-With':'accounting-quest'}}),env);assert.equal(r.status,200);
+r=await worker.fetch(new Request('https://local.test/api/status'),env);assert.equal((await r.json()).persistent,true);
+r=await worker.fetch(new Request('https://local.test/api/content',{method:'PUT',body:'{}'}),env);assert.equal(r.status,403);
+const changed=structuredClone(seed);const ref=changed.questions[0].refs[0];changed.laws.find(l=>l.id===ref.law).articles.find(a=>a.number===ref.article).text+='\n修正';reconcile(changed);assert.equal(changed.questions[0].status,'needs-review');assert.throws(()=>validateContent({...changed,questions:[{...changed.questions[0],status:'reviewed'}]}));
+const fixture='<a id="hlLawName">測試法</a><tr id="trLNNDate"><td>民國 115 年 01 月 01 日</td></tr><div class="col-no"><a name="1">第 1 條</a></div><div class="col-data"><div class="law-article"><div>第一段</div><div>第二段</div></div></div></div>';
+assert.equal(parseLaw(fixture,{name:'測試法',id:'J0000001',articles:[{}]}).articles[0].text,'第一段\n第二段');assert.throws(()=>parseLaw('<h1>error</h1>',seed.laws[0]));
+for(const path of ['/','/style.css','/app.js'])assert.equal((await worker.fetch(new Request('https://local.test'+path),env)).status,200);
+console.log('Passed: all question references, content writer/readback, schema rejection, changed-article quarantine, parser completeness, asset routes.');
