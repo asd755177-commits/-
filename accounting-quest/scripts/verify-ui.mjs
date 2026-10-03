@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const data=JSON.parse(fs.readFileSync('content/seed.json','utf8')),plan=JSON.parse(fs.readFileSync('content/course.json','utf8'));
+const elements=new Map();const element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',value:'',href:'',classList:{toggle(){}},showModal(){},close(){},setCustomValidity(){},reportValidity(){}});return elements.get(id)};
+const ctx={console,Date,Math,Map,Set,JSON,Number,String,Error,alert(){},document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){}},window:{scrollTo(){}},fetch:async path=>({ok:true,json:async()=>path==='/api/content'?data:{progress:{version:1,lessons:{}}}})};
+vm.createContext(ctx);vm.runInContext('const COURSE_PLAN='+JSON.stringify(plan)+';\n'+fs.readFileSync('worker/app.js','utf8')+'\n'+fs.readFileSync('worker/features.js','utf8'),ctx);
+await new Promise(r=>setImmediate(r));vm.runInContext('switchView("ask")',ctx);assert(element('#view').innerHTML.includes('ask-form'));assert(element('#view').innerHTML.includes('未接入生成式 AI'));
+vm.runInContext('switchView("course")',ctx);await new Promise(r=>setImmediate(r));assert(element('#view').innerHTML.includes('第 14 課'));assert(element('#view').innerHTML.includes('進度已讀取'));
+vm.runInContext('openLesson("day01")',ctx);assert(element('#view').innerHTML.includes('開始本課測驗 · 5 題'));
+vm.runInContext('startCourse("day01"); selected=quiz.questions[0].answer;submit()',ctx);assert(element('#view').innerHTML.includes('判斷正確'));assert.equal(vm.runInContext('quiz.results[0].selected===quiz.questions[0].answer',ctx),true);
+vm.runInContext('quiz.index=quiz.questions.length;courseSaving=true;renderQuiz()',ctx);assert(element('#view').innerHTML.includes('正在儲存學習進度'));
+console.log('Passed: ask form, curriculum render, lesson reading, scored answer capture, durable-save feedback.');
