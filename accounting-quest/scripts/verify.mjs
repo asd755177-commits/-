@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import worker,{validateContent,parseLaw,reconcile} from '../dist/server/index.js';
+import worker,{validateContent,parseLaw,reconcile,answerQuestion} from '../dist/server/index.js';
 const seed=JSON.parse(fs.readFileSync('content/seed.json','utf8'));
 validateContent(seed);
 const mem=new Map();const env={CONTENT:{get:async key=>mem.has(key)?{json:async()=>JSON.parse(mem.get(key))}:null,put:async(k,v)=>mem.set(k,v)}};
@@ -13,3 +13,19 @@ const fixture='<a id="hlLawName">測試法</a><tr id="trLNNDate"><td>民國 115 
 assert.equal(parseLaw(fixture,{name:'測試法',id:'J0000001',articles:[{}]}).articles[0].text,'第一段\n第二段');assert.throws(()=>parseLaw('<h1>error</h1>',seed.laws[0]));
 for(const path of ['/','/style.css','/app.js'])assert.equal((await worker.fetch(new Request('https://local.test'+path),env)).status,200);
 console.log('Passed: all question references, content writer/readback, schema rejection, changed-article quarantine, parser completeness, asset routes.');
+const plan=JSON.parse(fs.readFileSync('content/course.json','utf8'));
+const ask=answerQuestion(seed,'先收訂金怎麼入帳？');assert(ask.matches.some(q=>q.id==='q6'));assert(ask.matches.every(q=>q.refs.every(r=>r.url.startsWith('https://law.moj.gov.tw/'))));
+const paused=structuredClone(seed);paused.questions.find(q=>q.id==='q6').status='needs-review';assert(!answerQuestion(paused,'先收訂金怎麼入帳？').matches.some(q=>q.id==='q6'));
+assert.equal(answerQuestion(seed,'xxyyzz').matches.length,0);
+const store2=new Map();const env2={CONTENT:{get:async k=>store2.has(k)?{etag:'v1',json:async()=>JSON.parse(store2.get(k))}:null,put:async(k,v)=>{store2.set(k,v);return {etag:'v1'}}}};
+const req=(user,body,origin)=>new Request('https://local.test/api/course',{method:body?'POST':'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),...(body?{'X-Requested-With':'accounting-quest'}:{}),...(origin?{Origin:origin}:{})},...(body?{body:JSON.stringify(body)}:{})});
+assert.equal((await worker.fetch(req(null),env2)).status,401);
+const lesson=plan[0],body={lesson:lesson.id,answers:lesson.ids.map(id=>({id,selected:seed.questions.find(q=>q.id===id).answer}))};
+assert.equal((await worker.fetch(req('a',body,'https://evil.test'),env2)).status,403);
+r=await worker.fetch(req('a',body),env2);const saved=await r.json();assert.equal(saved.score,100);assert.equal(saved.saved,true);
+assert.equal((await(await worker.fetch(req('a'),env2)).json()).progress.lessons.day01.completed,true);
+assert.equal(Object.keys((await(await worker.fetch(req('b'),env2)).json()).progress.lessons).length,0);
+assert.equal((await worker.fetch(req('a',{...body,answers:body.answers.slice(1)}),env2)).status,400);
+store2.set('content-v1.json',JSON.stringify(changed));assert.equal((await worker.fetch(req('a',body),env2)).status,409);assert.equal((await(await worker.fetch(req('a'),env2)).json()).progress.lessons.day01.best,100);
+for(const c of plan)assert(c.ids.every(id=>seed.questions.some(q=>q.id===id)));
+console.log('Passed: grounded Q&A, paused-answer exclusion, no-match, learner identity isolation, score readback, cross-origin rejection, changed-law course pause.');
